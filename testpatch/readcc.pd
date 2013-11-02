@@ -1,0 +1,9 @@
+#N canvas 576 495 450 300 10;
+#X obj 166 62 ctlin;
+#X obj 181 127 == \$1;
+#X obj 152 176 spigot;
+#X obj 153 224 outlet;
+#X connect 0 0 2 0;
+#X connect 0 1 1 0;
+#X connect 1 0 2 1;
+#X connect 2 0 3 0;
