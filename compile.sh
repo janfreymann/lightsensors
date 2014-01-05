@@ -1,1 +1,1 @@
-gcc dosen.c -o dosen -l lo
+gcc combined.c -o combined -l lo -lm
