@@ -27,6 +27,9 @@ typedef struct vect dvector;
 
 double lux(int ch0, int ch1);
 
+int magnetMeasures = 0;
+dvector magnetBase;
+
 //methoden:
 
 void openPort(int *fd); //greife auf i2c treiber zu
@@ -38,6 +41,7 @@ lo_address initOSC(char *addr, char *port);
 void sendMagnetRead(int *fd);
 dvector readMagnetVector(int *fd);
 double convert2sComp(unsigned char a, unsigned char b);
+double formatAngle(double rad);
 
 void openPort(int *fd) {
     if((*fd = open("/dev/i2c-1", O_RDWR)) < 0) {
@@ -76,16 +80,40 @@ dvector readMagnetVector(int *fd) {
     vc.z = convert2sComp(buf[2], buf[3]);
     vc.y = convert2sComp(buf[4], buf[5]);
 
-    //printf("Magnet: %f %f %f\n", vc.x, vc.y, vc.z);
+    //normalize vector:
+
+    double length = sqrt(vc.x*vc.x + vc.y*vc.y + vc.z * vc.z);
+    vc.x /= length;
+    vc.y /= length;
+    vc.z /= length;
+/*
+    //lose precision (remove noise)
+
+    vc.x = (double) ((int) ( vc.x * 10));
+    vc.y = (double) ((int) (vc.y * 10));
+    vc.z = (double) ((int) ( vc.z * 10));
+
+    printf("Magnet: %f %f %f %f\n", vc.x, vc.y, vc.z, length);
+*/
+    //compute angles:
+
+    double phi1 = formatAngle(atan2(vc.y, vc.x));
+    double phi2 = formatAngle(atan2(vc.z, vc.x));
+    printf("Manget angles: %f %f\n", phi1, phi2);
 
     return vc;
+}
+double formatAngle(double rad) {
+    //if(rad < 0.0) { return formatAngle(M_PI + rad); }
+    //else if(rad >2* M_PI) { return formatAngle(rad - M_PI); }
+    return rad;
 }
 double convert2sComp(unsigned char msb, unsigned char lsb) {
     long t = msb * 0x100L + lsb;	
     if(t >= 32768) {
         t -= 65536;
     }
-    return (double) t / 32768.0;
+    return (double) t;
 }
 
 double readLight(int* fd, int *cLow, int *cHigh) {
