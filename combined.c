@@ -28,7 +28,9 @@ typedef struct vect dvector;
 double lux(int ch0, int ch1);
 
 int magnetMeasures = 0;
-dvector magnetBase;
+
+double phi1base = 0.0;
+double phi2base = 0.0;
 
 //methoden:
 
@@ -96,16 +98,23 @@ dvector readMagnetVector(int *fd) {
     printf("Magnet: %f %f %f %f\n", vc.x, vc.y, vc.z, length);
 */
     //compute angles:
+	
+	if(magnetMeasures) {
+		phi1base = atan2(vc.y, vc.x);
+		phi2base = atan2(vc.z, vc.x);
+	}
+	magnetMeasures = 1;
 
-    double phi1 = formatAngle(atan2(vc.y, vc.x));
-    double phi2 = formatAngle(atan2(vc.z, vc.x));
-    printf("Manget angles: %f %f\n", phi1, phi2);
+    double phi1 = formatAngle(atan2(vc.y, vc.x) - phi1base);
+    double phi2 = formatAngle(atan2(vc.z, vc.x) - phi2base);
+	
+	printf("Manget angles: %f %f\n", phi1, phi2);
 
     return vc;
 }
 double formatAngle(double rad) {
-    //if(rad < 0.0) { return formatAngle(M_PI + rad); }
-    //else if(rad >2* M_PI) { return formatAngle(rad - M_PI); }
+    if(rad < (2 * M_PI)) { return formatAngle(M_PI + rad); }
+    else if(rad > 2* M_PI) { return formatAngle(rad - M_PI); }
     return rad;
 }
 double convert2sComp(unsigned char msb, unsigned char lsb) {
