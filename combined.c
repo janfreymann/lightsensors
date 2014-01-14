@@ -41,9 +41,14 @@ void sendOSC(lo_address *t, char *msg, double param);
 lo_address initOSC(char *addr, char *port);
 
 void sendMagnetRead(int *fd);
-dvector readMagnetVector(int *fd);
+int readMagnetVector(int *fd);
 double convert2sComp(unsigned char a, unsigned char b);
 double formatAngle(double rad);
+
+//record changes in magnetic field:
+
+dvector mHistory[10];
+int mIndx = 0;
 
 void openPort(int *fd) {
     if((*fd = open("/dev/i2c-1", O_RDWR)) < 0) {
@@ -66,7 +71,7 @@ void sendMagnetRead(int *fd) {
         printf("Kann Register nicht an Chip senden.\n");
     }
 }
-dvector readMagnetVector(int *fd) { 
+int readMagnetVector(int *fd) { 
     dvector vc; 
     unsigned char buf[10];
     buf[0] = 0x06; //todo ??
@@ -94,26 +99,44 @@ dvector readMagnetVector(int *fd) {
     vc.x = (double) ((int) ( vc.x * 10));
     vc.y = (double) ((int) (vc.y * 10));
     vc.z = (double) ((int) ( vc.z * 10));
-
-    printf("Magnet: %f %f %f %f\n", vc.x, vc.y, vc.z, length);
 */
+//    printf("Magnet: %f %f %f %f\n", vc.x, vc.y, vc.z, length);
+
     //compute angles:
 	
-	if(magnetMeasures) {
+	if(magnetMeasures == 0) {
 		phi1base = atan2(vc.y, vc.x);
-		phi2base = atan2(vc.z, vc.x);
 	}
 	magnetMeasures = 1;
 
     double phi1 = formatAngle(atan2(vc.y, vc.x) - phi1base);
-    double phi2 = formatAngle(atan2(vc.z, vc.x) - phi2base);
+    //rotate around -phi1 around z axis
+    double xx = vc.x * cos(-phi1) - vc.y * sin(-phi1);
+    double yy = vc.x * sin(-phi1) + vc.y * cos(-phi1);
+    double phi2 = formatAngle(atan2(vc.z, xx));
 	
-	printf("Manget angles: %f %f\n", phi1, phi2);
+//	printf("Manget angles: %f %f\n", phi1, phi2);
+//    printf("Magnet strength: %f\n", length);
 
-    return vc;
+    //use changes in magnetic field:
+
+    mHistory[mIndx] = vc;
+    mIndx = (mIndx + 1) % 10;
+    
+    int k;
+    double cumQsum = 0.0;
+    for(k = 1; k < 10; k++) {
+        cumQsum += (mHistory[k].x - mHistory[k-1].x)*(mHistory[k].x - mHistory[k-1].x);
+        cumQsum += (mHistory[k].y - mHistory[k-1].y)*(mHistory[k].y - mHistory[k-1].y);
+        cumQsum += (mHistory[k].z - mHistory[k-1].z)*(mHistory[k].z - mHistory[k-1].z);
+    }
+    int fluctuations = (int) (cumQsum * 100.0);
+    printf("Fluctuations: %d\n", fluctuations);
+
+    return fluctuations;
 }
 double formatAngle(double rad) {
-    if(rad < (2 * M_PI)) { return formatAngle(M_PI + rad); }
+    if(rad < -(2 * M_PI)) { return formatAngle(M_PI + rad); }
     else if(rad > 2* M_PI) { return formatAngle(rad - M_PI); }
     return rad;
 }
@@ -189,6 +212,12 @@ int main(int argc, char** argv) {
     int active[2] = {0, 0};
     double actThr = 0.1; //Schwellenwert um Verdunklung zu erkennen
 
+    //initialisiere magnet history mit Null:
+ 
+    for(i = 0; i < 10; i++) {
+        mHistory[i].x = mHistory[i].y = mHistory[i].z = 0.0;
+    }
+
     //initialisiere OSC:
 
     lo_address oscaddr = initOSC("192.168.1.125", "7777");
@@ -225,10 +254,8 @@ int main(int argc, char** argv) {
  
         usleep(13 * 1000);
 
-        magnetVec = readMagnetVector(&fd[2]);
-        sendOSC(&oscaddr, "/magnetX", magnetVec.x);
-        sendOSC(&oscaddr, "/magnetY", magnetVec.y);
-        sendOSC(&oscaddr, "/magnetZ", magnetVec.z);
+        int magnetFlux = readMagnetVector(&fd[2]);
+        sendOSC(&oscaddr, "/magnet", magnetFlux);
 
     }
     return 0;
