@@ -1,4 +1,5 @@
 ./startchip.sh
 ./startmagnet.sh
-./combined
+sleep 1
+./combined 192.168.1.26&
 
