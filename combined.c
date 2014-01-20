@@ -50,6 +50,8 @@ double formatAngle(double rad);
 dvector mHistory[10];
 int mIndx = 0;
 
+int verbose = 0;
+
 void openPort(int *fd) {
     if((*fd = open("/dev/i2c-1", O_RDWR)) < 0) {
         printf("Kann i2c port 1 nicht oeffnen.\n");
@@ -131,8 +133,9 @@ int readMagnetVector(int *fd) {
         cumQsum += (mHistory[k].z - mHistory[k-1].z)*(mHistory[k].z - mHistory[k-1].z);
     }
     int fluctuations = (int) (cumQsum * 100.0);
-    printf("Fluctuations: %d\n", fluctuations);
-
+    if((fluctuations > 0) && (verbose)) {
+        printf("Fluctuations: %d\n", fluctuations);
+    }
     return fluctuations;
 }
 double formatAngle(double rad) {
@@ -176,7 +179,18 @@ double readLight(int* fd, int *cLow, int *cHigh) {
 }
 
 int main(int argc, char** argv) {
-    printf("i2c c test.\n");
+    if(argc == 2) {
+       /* if(strcmp(argv[1], "-v") == 0) {
+            verbose = 1;
+            printf("verbose!\n"); 
+        }*/
+        printf("Connecting to address %s on port 7777\n", argv[1]);
+    }
+    else {
+       printf("Usage: ./combined <ip-address>\n");
+       return 0;
+    }
+    printf("i2c to OSC.\n");
     int fd[3];
     unsigned char buf[10];
     char *fileName = "/dev/i2c-1";
@@ -220,7 +234,7 @@ int main(int argc, char** argv) {
 
     //initialisiere OSC:
 
-    lo_address oscaddr = initOSC("192.168.1.125", "7777");
+    lo_address oscaddr = initOSC(argv[1], "7777");
 
     while(1) {
         for(i = 0; i < 2; i++) {
@@ -233,7 +247,10 @@ int main(int argc, char** argv) {
                 if(active[i]) {
                     if((lastcc[i] > maxcc[i] + epsilon) || (lastcc[i] < maxcc[i] - epsilon)) {
                         //Lichtintensitaet hat sich signifikant geaendert -> Ausgabe!
-                        printf("%d Licht: %f\n", i, maxcc[i]);
+                        
+                        if(verbose) {   
+                            printf("%d Licht: %f\n", i, maxcc[i]);
+                        }
                         if(i == 0) sendOSC(&oscaddr, "/licht0", maxcc[i]);
                         else if(i == 1) sendOSC(&oscaddr, "/licht1", maxcc[i]);
                         lastcc[i] = maxcc[i];
@@ -255,8 +272,9 @@ int main(int argc, char** argv) {
         usleep(13 * 1000);
 
         int magnetFlux = readMagnetVector(&fd[2]);
-        sendOSC(&oscaddr, "/magnet", magnetFlux);
-
+        if(magnetFlux > 0) {
+            sendOSC(&oscaddr, "/magnet", magnetFlux);
+        }
     }
     return 0;
 }
