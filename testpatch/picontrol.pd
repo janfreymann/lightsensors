@@ -1,11 +1,11 @@
-#N canvas 523 349 450 300 10;
+#N canvas 244 105 450 300 10;
 #X declare -lib mrpeach;
 #X obj 163 91 import mrpeach;
 #X obj 275 160 packOSC;
 #X obj 167 230 udpsend;
 #X msg 69 142 connect 192.168.1.4 7778;
-#X msg 280 102 /restart;
 #X msg 321 29 /shutdown;
+#X msg 279 102 /restart 192.168.1.34;
 #X connect 1 0 2 0;
 #X connect 3 0 2 0;
 #X connect 4 0 1 0;
